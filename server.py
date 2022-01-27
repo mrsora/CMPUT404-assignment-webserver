@@ -1,14 +1,15 @@
-#  coding: utf-8 
+#  coding: utf-8
 import socketserver
+import os
 
 # Copyright 2013 Abram Hindle, Eddie Antonio Santos
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 #     http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -28,11 +29,104 @@ import socketserver
 
 
 class MyWebServer(socketserver.BaseRequestHandler):
-    
+
     def handle(self):
+
         self.data = self.request.recv(1024).strip()
-        print ("Got a request of: %s\n" % self.data)
-        self.request.sendall(bytearray("OK",'utf-8'))
+        # print("Got a request of: %s\n" % self.data)
+
+        # formatting data into readable content
+        content = self.data.decode('utf-8').split('\r\n')
+        firstLineContent = content[0].split(' ')
+        requestedContent = firstLineContent[1]
+        method = firstLineContent[0]
+
+        # only handle for GET requests
+        if method == 'GET':
+            print('-----------------------------------')
+            print(">>Requested Content:", requestedContent)
+            redirected = False
+            path = './www'
+
+            if requestedContent[-1] == '/':
+                # check if looking for index page
+                path = path + requestedContent + 'index.html'
+            elif requestedContent.split('.')[
+                    -1] == 'html' or requestedContent.split('.')[-1] == 'css':
+                # check if is html/css ending
+                path = path + requestedContent
+            else:
+                # if here, then is not html/css nor is it looking for index
+                # path is fixed to check if file actually exists.
+                path = path + requestedContent + '/'
+                redirected = True
+
+            print("Redirected1:", redirected)
+            # now that we have the path, we check if the file exists
+            try:
+                f = open(path, 'r')
+            except Exception as e:
+                print(">>Exception Raised:", e)
+                self.request.sendall(
+                    bytearray("HTTP/1.1 404 File not found\r\n", "utf-8"))
+                # self.sendMessage("404 File not found")
+                return 0
+
+            # if file exists but needed redirection, return 301
+            print("Redirected2:", redirected)
+            if redirected:
+                self.request.sendall(
+                    bytearray(
+                        "HTTP/1.1 301 Moved Permanently\r\n Location: " +
+                        path + "\r\n", "utf-8"))
+                # self.sendMessage("301 Moved Permanently")
+                # self.sendMessage(f"Location: {path}", False)
+                return 0
+
+            # get content type
+            if path[-3:] == 'css':
+                contentType = "Content-Type: text/css"
+            elif path[-4:] == 'html':
+                contentType = "Content-Type: text/html"
+            else:
+                self.request.sendall(
+                    bytearray("HTTP/1.1 404 File not found\r\n", "utf-8"))
+                return 0
+            print(">>Content Type:", contentType)
+
+            # everything is valid, send the content type then the file
+            # file sending adapted from https://stackoverflow.com/questions/9382045/send-a-file-through-sockets-in-python
+
+            self.request.sendall(bytearray(
+                'HTTP/1.1 200 OK\r\n' \
+                + contentType + '\r\n\r\n' \
+                + open(path).read(), "utf-8"))
+
+            # self.sendMessage('200 OK')
+            # self.sendMessage(contentType, False)
+            # self.sendMessage('Content-Length: ' + str(os.stat(path).st_size), False)
+
+            # print(">> Type of: ", type(f))
+            # contentSection = f.read(1024)
+            # while contentSection:
+            #     self.request.send(bytearray(contentSection, "utf-8"))
+            #     contentSection = f.read(1024)
+
+            # cleanup
+            f.close()
+
+        else:
+            self.sendMessage('405 Method Not Allowed')
+            return 0
+
+    def sendMessage(self, message: str, http=True) -> bytearray:
+        if http:
+            self.request.sendall(
+                bytearray("HTTP/1.1 " + message + "\r\n", "utf-8"))
+            print("<<sendMessage: " + "HTTP/1.1 " + message + "\\r\\n>>")
+        else:
+            self.request.sendall(bytearray(message + "\r\n", "utf-8"))
+
 
 if __name__ == "__main__":
     HOST, PORT = "localhost", 8080
