@@ -58,7 +58,7 @@ class MyWebServer(socketserver.BaseRequestHandler):
                 # path is fixed to check if file actually exists.
                 path = path + requestedContent + '/'
 
-            # now that we have the path, we check if the file exists
+            # only improperly named files are directories
             if os.path.isdir(path):
                 self.request.sendall(
                     bytearray(
