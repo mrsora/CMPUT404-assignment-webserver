@@ -1,6 +1,7 @@
 #  coding: utf-8
 import socketserver
 import os
+from urllib import request
 
 # Copyright 2013 Abram Hindle, Eddie Antonio Santos
 #
@@ -33,7 +34,7 @@ class MyWebServer(socketserver.BaseRequestHandler):
     def handle(self):
 
         self.data = self.request.recv(1024).strip()
-        # print("Got a request of: %s\n" % self.data)
+        print("Got a request of: %s\n" % self.data)
 
         # formatting data into readable content
         content = self.data.decode('utf-8').split('\r\n')
@@ -43,9 +44,6 @@ class MyWebServer(socketserver.BaseRequestHandler):
 
         # only handle for GET requests
         if method == 'GET':
-            print('-----------------------------------')
-            print(">>Requested Content:", requestedContent)
-            redirected = False
             path = './www'
 
             if requestedContent[-1] == '/':
@@ -59,28 +57,20 @@ class MyWebServer(socketserver.BaseRequestHandler):
                 # if here, then is not html/css nor is it looking for index
                 # path is fixed to check if file actually exists.
                 path = path + requestedContent + '/'
-                redirected = True
 
-            print("Redirected1:", redirected)
             # now that we have the path, we check if the file exists
+            if os.path.isdir(path):
+                self.request.sendall(
+                    bytearray(
+                        "HTTP/1.1 301 Moved Permanently\r\nLocation: " +
+                        path.strip('./www') + "\r\n\r\n", "utf-8"))
+                return 0
+
             try:
                 f = open(path, 'r')
             except Exception as e:
-                print(">>Exception Raised:", e)
                 self.request.sendall(
-                    bytearray("HTTP/1.1 404 File not found\r\n", "utf-8"))
-                # self.sendMessage("404 File not found")
-                return 0
-
-            # if file exists but needed redirection, return 301
-            print("Redirected2:", redirected)
-            if redirected:
-                self.request.sendall(
-                    bytearray(
-                        "HTTP/1.1 301 Moved Permanently\r\n Location: " +
-                        path + "\r\n", "utf-8"))
-                # self.sendMessage("301 Moved Permanently")
-                # self.sendMessage(f"Location: {path}", False)
+                    bytearray("HTTP/1.1 404 File not found\r\n\r\n", "utf-8"))
                 return 0
 
             # get content type
@@ -90,42 +80,23 @@ class MyWebServer(socketserver.BaseRequestHandler):
                 contentType = "Content-Type: text/html"
             else:
                 self.request.sendall(
-                    bytearray("HTTP/1.1 404 File not found\r\n", "utf-8"))
+                    bytearray("HTTP/1.1 404 File not found\r\n\r\n", "utf-8"))
                 return 0
-            print(">>Content Type:", contentType)
 
-            # everything is valid, send the content type then the file
-            # file sending adapted from https://stackoverflow.com/questions/9382045/send-a-file-through-sockets-in-python
-
+            # you can send everything at once??????
             self.request.sendall(bytearray(
                 'HTTP/1.1 200 OK\r\n' \
                 + contentType + '\r\n\r\n' \
                 + open(path).read(), "utf-8"))
 
-            # self.sendMessage('200 OK')
-            # self.sendMessage(contentType, False)
-            # self.sendMessage('Content-Length: ' + str(os.stat(path).st_size), False)
-
-            # print(">> Type of: ", type(f))
-            # contentSection = f.read(1024)
-            # while contentSection:
-            #     self.request.send(bytearray(contentSection, "utf-8"))
-            #     contentSection = f.read(1024)
-
             # cleanup
             f.close()
+            return 1
 
         else:
-            self.sendMessage('405 Method Not Allowed')
-            return 0
-
-    def sendMessage(self, message: str, http=True) -> bytearray:
-        if http:
             self.request.sendall(
-                bytearray("HTTP/1.1 " + message + "\r\n", "utf-8"))
-            print("<<sendMessage: " + "HTTP/1.1 " + message + "\\r\\n>>")
-        else:
-            self.request.sendall(bytearray(message + "\r\n", "utf-8"))
+                bytearray("HTTP/1.1 405 Method Not Allowed\r\n\r\n", "utf-8"))
+            return 0
 
 
 if __name__ == "__main__":
