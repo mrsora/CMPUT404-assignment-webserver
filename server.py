@@ -29,6 +29,10 @@ from urllib import request
 # try: curl -v -X GET http://127.0.0.1:8080/
 
 
+# + "Server: ServerInParentsBasement\r\n" \
+# + "Content-Length: 0\r\n" \
+# + "Connection: close\r\n" \
+
 class MyWebServer(socketserver.BaseRequestHandler):
 
     def handle(self):
@@ -60,17 +64,24 @@ class MyWebServer(socketserver.BaseRequestHandler):
 
             # only improperly named files are directories
             if os.path.isdir(path):
-                self.request.sendall(
-                    bytearray(
-                        "HTTP/1.1 301 Moved Permanently\r\nLocation: " +
-                        path.strip('./www') + "\r\n\r\n", "utf-8"))
+                self.request.sendall(bytearray(
+                    "HTTP/1.1 301 Moved Permanently\r\n" \
+                    + "Server: ServerInParentsBasement\r\n" \
+                    + "Location: " + path.strip('./www') + "\r\n" \
+                    + "Content-Length: 0\r\n" \
+                    + "Connection: close\r\n" \
+                    + "\r\n", "utf-8"))
                 return 0
 
             try:
                 f = open(path, 'r')
             except Exception as e:
-                self.request.sendall(
-                    bytearray("HTTP/1.1 404 File not found\r\n\r\n", "utf-8"))
+                self.request.sendall(bytearray(
+                    "HTTP/1.1 404 File not found\r\n" \
+                    + 'Server: ServerInParentsBasement\r\n' \
+                    + "Content-Length: 0\r\n" \
+                    + "Connection: close\r\n" \
+                    + "\r\n", "utf-8"))
                 return 0
 
             # get content type
@@ -79,14 +90,22 @@ class MyWebServer(socketserver.BaseRequestHandler):
             elif path[-4:] == 'html':
                 contentType = "Content-Type: text/html"
             else:
-                self.request.sendall(
-                    bytearray("HTTP/1.1 404 File not found\r\n\r\n", "utf-8"))
+                self.request.sendall(bytearray(
+                    "HTTP/1.1 404 File not found\r\n" \
+                    + 'Server: ServerInParentsBasement\r\n' \
+                    + "Content-Length: 0\r\n" \
+                    + "Connection: close\r\n" \
+                    + "\r\n", "utf-8"))
                 return 0
 
             # you can send everything at once??????
             self.request.sendall(bytearray(
                 'HTTP/1.1 200 OK\r\n' \
-                + contentType + '\r\n\r\n' \
+                + 'Server: LastMinuteChanges\r\n' \
+                + 'Content-Length: ' + str(os.stat(path).st_size) + '\r\n' \
+                + contentType + '\r\n' \
+                + "Connection: close\r\n" \
+                + '\r\n' \
                 + open(path).read(), "utf-8"))
 
             # cleanup
@@ -94,8 +113,12 @@ class MyWebServer(socketserver.BaseRequestHandler):
             return 1
 
         else:
-            self.request.sendall(
-                bytearray("HTTP/1.1 405 Method Not Allowed\r\n\r\n", "utf-8"))
+            self.request.sendall(bytearray(
+                "HTTP/1.1 405 Method Not Allowed\r\n" \
+                + 'Server: ServerInParentsBasement\r\n' \
+                + "Content-Length: 0\r\n" \
+                + "Connection: close\r\n" \
+                + "\r\n", "utf-8"))
             return 0
 
 
